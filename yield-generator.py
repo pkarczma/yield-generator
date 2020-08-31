@@ -8,20 +8,31 @@ from EventPool import EventPool
 # Generator settings
 nev = 1000
 npart = 100
+step = 10
 # Generator settings for event mixing
 targettracksize = 1000
+
+# Efficiency and corrections
+eff = 1.0
+weight = 1.0
+if step == 6 or step == 10:
+    eff = 0.5
+if step == 10:
+    weight = 1. / eff
 
 # Generate dataset
 dataset = []
 for iev in range(0,nev):
     event = []
-    npart = random.randint(80, 120)
-    print(str(npart))
     for ii in range(0,npart):
         pt = random.uniform(0.5, 1.0)
         eta = random.uniform(-0.8, 0.8)
         phi = random.uniform(0, 2*math.pi)
-        event.append(Particle(pt, eta, phi))
+        particle = Particle(pt, eta, phi)
+        if step == 0:
+            event.append(Particle(pt, eta, phi))
+        elif step != 0 and particle.skip(eff) == False:
+            event.append(Particle(pt, eta, phi))
     dataset.append(event)
 
 # Prepare variables
@@ -40,34 +51,24 @@ cyield = TCanvas('cyield', 'Yield canvas', 200, 10, 700, 500)
 
 # Process dataset
 for event in dataset:
-    print(ievent)
+    print("Event " + str(ievent) + ": " + str(len(event)) + " particles")
+    # Loop over 'same' event
     for trig in event:
         ntrigger += 1
         for assoc in event:
             if trig == assoc:
                 continue
             pair = ParticlePair(trig, assoc)
-            deta = pair.deta
-            dphi = pair.dphi
-            if dphi < -0.5*pi:
-                dphi += 2*pi
-            if dphi > 1.5*pi:
-                dphi -= 2*pi
-            hsame.Fill(deta, dphi)
+            hsame.Fill(pair.deta, pair.dphi, weight)
+    # Check if event pool for 'mixed' event is ready
     if ep.is_ready():
         print("Event pool ready");
-        for mixtrig in ep.trackpool():
+        # Loop over 'mixed' event
+        for mixtrig in event:
             for mixassoc in ep.trackpool():
-                if mixtrig == mixassoc:
-                    continue
                 mixpair = ParticlePair(mixtrig, mixassoc)
-                mixdeta = mixpair.deta
-                mixdphi = mixpair.dphi
-                if mixdphi < -0.5*pi:
-                    mixdphi += 2*pi
-                if mixdphi > 1.5*pi:
-                    mixdphi -= 2*pi
-                hmixed.Fill(mixdeta, mixdphi)
+                hmixed.Fill(mixpair.deta, mixpair.dphi, 1. / len(ep.eventpool))
+    # Update mixed event pool
     ep.add(event)
     ievent += 1
 
@@ -87,7 +88,6 @@ gamma = 4. * f / mixedFactor
 print("gamma: " + str(gamma))
 
 # Calculate final yield
-#hyield = hsame.Clone()
 hyield.Add(hsame)
 hyield.Divide(hmixed)
 print("alpha / gamma: " + str(alpha / gamma))

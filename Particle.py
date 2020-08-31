@@ -1,3 +1,5 @@
+import random
+
 class Particle():
     # Particle is a generic particle class
     # containing all the parameters of itself
@@ -9,3 +11,13 @@ class Particle():
         self.eta = eta
         # - an azimuthal angle phi
         self.phi = phi
+    # Method for skipping particles due to efficiency
+    def skip(self, eff=1.0):
+        # Generate random value in (0, 1) range
+        rand = random.uniform(0, 1)
+        # Check if efficiency is lower than generated value
+        skip = False
+        if eff < rand:
+            skip = True
+        # Return the result
+        return skip
